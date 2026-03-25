@@ -1,1 +1,612 @@
 
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>GOKIBURYYYYY - ボスバトル・エディション</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: #f0f0f0;
+            font-family: 'Arial Black', Gadget, sans-serif;
+            touch-action: none;
+        }
+        #game-container {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+            z-index: 1;
+        }
+        #ui-layer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 2;
+            pointer-events: none;
+        }
+        #hud {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            color: #000;
+            background: rgba(255, 255, 255, 0.85);
+            padding: 8px 16px;
+            border-radius: 6px;
+            border-left: 6px solid #ffcc00;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.15);
+        }
+        #score-display {
+            font-size: 24px;
+            font-weight: 900;
+            letter-spacing: 1px;
+        }
+        #leaderboard {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 8px;
+            width: 180px;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.3);
+        }
+        #leaderboard h3 {
+            margin: 0 0 8px 0;
+            font-size: 14px;
+            text-align: center;
+            color: #ffffff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.5);
+            padding-bottom: 5px;
+        }
+        .leaderboard-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 4px;
+            font-size: 13px;
+            padding: 4px 8px;
+            border-radius: 3px;
+            background: rgba(255, 255, 255, 0.1);
+            color: #ffffff;
+            white-space: nowrap;
+            overflow: hidden;
+        }
+        .leaderboard-item.is-player {
+            background: #ffcc00;
+            color: #000000;
+            font-weight: 900;
+        }
+        .leaderboard-item.is-boss {
+            background: #ff0000;
+            color: #ffffff;
+            font-weight: 900;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.7; }
+            100% { opacity: 1; }
+        }
+        #boss-warning {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ff0000;
+            font-size: 60px;
+            font-weight: 900;
+            text-shadow: 0 0 20px #000;
+            display: none;
+            z-index: 5;
+            text-align: center;
+        }
+        #overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.95);
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            color: #000;
+            text-align: center;
+        }
+        button {
+            padding: 15px 40px;
+            font-size: 24px;
+            font-weight: 900;
+            background: #000;
+            color: #ffcc00;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            transition: all 0.2s;
+            margin-top: 20px;
+        }
+        button:hover {
+            transform: scale(1.05);
+            background: #222;
+        }
+        #minimap {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            width: 140px;
+            height: 140px;
+            background: rgba(255, 255, 255, 0.8);
+            border: 2px solid #000;
+            border-radius: 50%;
+            box-shadow: 0 0 15px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+<div id="game-container"></div>
+
+<div id="ui-layer">
+    <div id="hud">
+        <div id="score-display">SIZE: <span id="player-size">100</span></div>
+    </div>
+    <div id="leaderboard">
+        <h3>RANKING</h3>
+        <div id="leaderboard-list"></div>
+    </div>
+    <div id="minimap">
+        <canvas id="minimap-canvas" width="140" height="140"></canvas>
+    </div>
+    <div id="boss-warning">WARNING!<br>BOSS APPEARED</div>
+</div>
+
+<div id="overlay">
+    <h1 style="font-size: 60px; margin: 0; font-style: italic; letter-spacing: -3px;">GOKIBURYYYYY</h1>
+    <p style="font-size: 20px; color: #444; font-weight: bold;">静かなる捕食者。ボスを喰らい、頂点へ。</p>
+    <button id="start-btn">生存開始</button>
+</div>
+
+<script>
+    const ARENA_SIZE = 500;
+    const MAX_FOODS = 250;
+    const MAX_BOTS = 35;
+    const BASE_SPEED = 0.65;
+    const EAT_THRESHOLD = 1.1; 
+    const ATTACK_RANGE_MULTIPLIER = 2.6; 
+    
+    let scene, camera, renderer, player;
+    let entities = [];
+    let foods = [];
+    let isGameOver = true;
+    let bossExists = false;
+    
+    const raycaster = new THREE.Raycaster();
+    const mouse = new THREE.Vector2();
+    const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    const targetPoint = new THREE.Vector3();
+
+    const minimapCanvas = document.getElementById('minimap-canvas');
+    const minimapCtx = minimapCanvas.getContext('2d');
+    const overlay = document.getElementById('overlay');
+    const startBtn = document.getElementById('start-btn');
+    const sizeDisplay = document.getElementById('player-size');
+    const leaderboardList = document.getElementById('leaderboard-list');
+    const bossWarning = document.getElementById('boss-warning');
+
+    const botNames = ["DeathBug", "King-G", "FastCrawler", "BrownDevil", "Shadow", "WallStar", "Turbo-G", "EliteBug"];
+
+    function createRoachMesh(colorStr, isPlayer, isBoss = false) {
+        const group = new THREE.Group();
+        const material = new THREE.MeshPhongMaterial({ 
+            color: isBoss ? 0x110000 : colorStr,
+            shininess: isBoss ? 400 : 250,
+            specular: isBoss ? 0xff0000 : 0xaaaaaa
+        });
+        
+        for(let i=0; i<3; i++) {
+            const segmentGeo = new THREE.SphereGeometry(1, 24, 24);
+            const segment = new THREE.Mesh(segmentGeo, material);
+            const zOff = -0.4 + i * 0.45;
+            segment.scale.set(0.6 - (i*0.05), 0.22, 0.5);
+            segment.position.set(0, 0.25, zOff);
+            segment.castShadow = true;
+            segment.receiveShadow = true;
+            group.add(segment);
+        }
+
+        const headGeo = new THREE.SphereGeometry(0.38, 16, 16);
+        const headMat = new THREE.MeshPhongMaterial({ color: 0x010101, shininess: 150 });
+        const head = new THREE.Mesh(headGeo, headMat);
+        head.scale.set(1.1, 0.55, 1.2);
+        head.position.set(0, 0.25, 1.35);
+        group.add(head);
+
+        const wingGeo = new THREE.SphereGeometry(1.05, 24, 24);
+        const wingMat = new THREE.MeshPhongMaterial({ 
+            color: isBoss ? 0x220000 : colorStr, 
+            transparent: true, 
+            opacity: 0.85, 
+            shininess: 300 
+        });
+        const wing = new THREE.Mesh(wingGeo, wingMat);
+        wing.scale.set(0.6, 0.12, 1.1);
+        wing.position.set(0, 0.38, -0.1);
+        group.add(wing);
+
+        const antennaMat = new THREE.LineBasicMaterial({ color: isBoss ? 0xff0000 : 0x111111 });
+        const ant1Geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0.8, 0.5, 2.2)]);
+        const ant2Geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(-0.8, 0.5, 2.2)]);
+        const ant1 = new THREE.Line(ant1Geo, antennaMat);
+        const ant2 = new THREE.Line(ant2Geo, antennaMat);
+        ant1.position.set(0.1, 0.35, 1.5);
+        ant2.position.set(-0.1, 0.35, 1.5);
+        group.add(ant1);
+        group.add(ant2);
+
+        const legMat = new THREE.MeshPhongMaterial({ color: 0x030303 });
+        const legs = [];
+        for(let i=0; i<3; i++) {
+            const zPos = -0.7 + i * 0.7;
+            [-1, 1].forEach(side => {
+                const legRoot = new THREE.Group();
+                legRoot.position.set(0.45 * side, 0.2, zPos);
+                const thighGeo = new THREE.CylinderGeometry(0.04, 0.03, 0.85);
+                const thigh = new THREE.Mesh(thighGeo, legMat);
+                thigh.rotation.z = (Math.PI/2 - 0.3) * side;
+                thigh.position.x = 0.4 * side;
+                legRoot.add(thigh);
+                const shinGeo = new THREE.CylinderGeometry(0.025, 0.01, 1.1);
+                const shin = new THREE.Mesh(shinGeo, legMat);
+                shin.position.set(0.8 * side, -0.25, 0);
+                shin.rotation.z = (Math.PI/3.5) * side;
+                legRoot.add(shin);
+                group.add(legRoot);
+                legs.push({ mesh: legRoot, side: side, index: i });
+            });
+        }
+
+        // ボス用のオーラ
+        if (isBoss) {
+            const auraGeo = new THREE.TorusGeometry(2, 0.05, 16, 100);
+            const auraMat = new THREE.MeshBasicMaterial({ color: 0xff0000, transparent: true, opacity: 0.5 });
+            const aura = new THREE.Mesh(auraGeo, auraMat);
+            aura.rotation.x = Math.PI / 2;
+            aura.position.y = 0.1;
+            group.add(aura);
+            group.userData.aura = aura;
+        }
+
+        if (isPlayer) {
+            const rangeGeo = new THREE.RingGeometry(ATTACK_RANGE_MULTIPLIER - 0.05, ATTACK_RANGE_MULTIPLIER + 0.05, 64);
+            const rangeMat = new THREE.MeshBasicMaterial({ color: 0xffcc00, side: THREE.DoubleSide, transparent: true, opacity: 0.4 });
+            const rangeRing = new THREE.Mesh(rangeGeo, rangeMat);
+            rangeRing.rotation.x = -Math.PI / 2;
+            rangeRing.position.y = 0.02;
+            group.add(rangeRing);
+        }
+
+        return { mesh: group, legs: legs, antennas: [ant1, ant2] };
+    }
+
+    function createFoodMesh() {
+        const geo = new THREE.IcosahedronGeometry(0.3, 1);
+        const mat = new THREE.MeshPhongMaterial({ color: 0x5d2e0c, emissive: 0x110800 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.castShadow = true;
+        return mesh;
+    }
+
+    class Entity {
+        constructor(name, isPlayer = false, isBoss = false) {
+            this.name = name;
+            this.isPlayer = isPlayer;
+            this.isBoss = isBoss;
+            this.size = 1.0;
+            this.score = isBoss ? 2500 : 100;
+            this.targetAngle = 0;
+            this.currentAngle = 0;
+            this.speed = BASE_SPEED;
+            this.walkCycle = 0;
+            
+            let color = isPlayer ? 0x221108 : (Math.random() > 0.5 ? 0x331a0d : 0x1a0d05);
+            const model = createRoachMesh(color, isPlayer, isBoss);
+            this.mesh = model.mesh;
+            this.legs = model.legs;
+            this.antennas = model.antennas;
+            
+            this.mesh.position.set((Math.random()-0.5)*(ARENA_SIZE-60), 0, (Math.random()-0.5)*(ARENA_SIZE-60));
+            scene.add(this.mesh);
+            this.updateScale();
+        }
+
+        updateScale() {
+            this.size = 1.0 + Math.log10(this.score/100) * 1.8;
+            if (this.isBoss) this.size *= 1.5;
+            this.mesh.scale.set(this.size, this.size, this.size);
+            this.speed = BASE_SPEED * (1.0 / (1.0 + this.size * 0.06));
+            if (this.isBoss) this.speed *= 1.4; // ボスは巨体だが速い
+        }
+
+        move() {
+            let diff = this.targetAngle - this.currentAngle;
+            while(diff < -Math.PI) diff += Math.PI*2;
+            while(diff > Math.PI) diff -= Math.PI*2;
+            this.currentAngle += diff * 0.18;
+            this.mesh.rotation.y = this.currentAngle;
+            this.mesh.position.x += Math.sin(this.currentAngle) * this.speed;
+            this.mesh.position.z += Math.cos(this.currentAngle) * this.speed;
+
+            const limit = ARENA_SIZE/2;
+            if(Math.abs(this.mesh.position.x) > limit) {
+                this.mesh.position.x = Math.sign(this.mesh.position.x) * limit;
+                this.targetAngle = Math.random() * Math.PI * 2;
+            }
+            if(Math.abs(this.mesh.position.z) > limit) {
+                this.mesh.position.z = Math.sign(this.mesh.position.z) * limit;
+                this.targetAngle = Math.random() * Math.PI * 2;
+            }
+
+            this.walkCycle += this.speed * 2.8;
+            this.legs.forEach(leg => {
+                const phase = leg.index * 1.3 + (leg.side === 1 ? 0 : Math.PI);
+                leg.mesh.rotation.y = Math.sin(this.walkCycle + phase) * 0.8;
+                leg.mesh.position.y = 0.2 + Math.max(0, Math.cos(this.walkCycle + phase)) * 0.18;
+            });
+            this.antennas.forEach((ant, idx) => {
+                ant.rotation.z = Math.sin(Date.now() * 0.025 + idx) * 0.2;
+                ant.rotation.x = Math.cos(Date.now() * 0.02 + idx) * 0.2;
+            });
+
+            if (this.isBoss && this.mesh.userData.aura) {
+                this.mesh.userData.aura.scale.setScalar(1 + Math.sin(Date.now()*0.005)*0.2);
+            }
+        }
+    }
+
+    class Bot extends Entity {
+        constructor(name, isBoss = false) {
+            super(name, false, isBoss);
+            this.aiTimer = 0;
+            this.targetPoint = new THREE.Vector3();
+        }
+        updateAI() {
+            if (this.isBoss && player) {
+                // ボスはプレイヤーを執拗に追いかける
+                this.targetAngle = Math.atan2(player.mesh.position.x - this.mesh.position.x, player.mesh.position.z - this.mesh.position.z);
+                return;
+            }
+
+            if(--this.aiTimer <= 0) {
+                this.aiTimer = 15 + Math.random()*25;
+                if(Math.random() < 0.15) {
+                    this.targetPoint.set((Math.random()-0.5)*ARENA_SIZE, 0, (Math.random()-0.5)*ARENA_SIZE);
+                }
+            }
+            this.targetAngle = Math.atan2(this.targetPoint.x - this.mesh.position.x, this.targetPoint.z - this.mesh.position.z);
+        }
+    }
+
+    function init() {
+        scene = new THREE.Scene();
+        scene.background = new THREE.Color(0xf5f5f5);
+        scene.fog = new THREE.Fog(0xf5f5f5, 80, 500);
+
+        camera = new THREE.PerspectiveCamera(60, window.innerWidth/window.innerHeight, 0.1, 1500);
+        renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.getElementById('game-container').appendChild(renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.7));
+        const sun = new THREE.DirectionalLight(0xffffff, 0.7);
+        sun.position.set(40, 150, -10);
+        sun.castShadow = true;
+        sun.shadow.mapSize.width = 2048;
+        sun.shadow.mapSize.height = 2048;
+        sun.shadow.camera.left = -500;
+        sun.shadow.camera.right = 500;
+        sun.shadow.camera.top = 500;
+        sun.shadow.camera.bottom = -500;
+        scene.add(sun);
+
+        const floorGeo = new THREE.PlaneGeometry(ARENA_SIZE, ARENA_SIZE);
+        const floorMat = new THREE.MeshPhongMaterial({ color: 0xffffff, shininess: 60, specular: 0x222222 });
+        const floor = new THREE.Mesh(floorGeo, floorMat);
+        floor.rotation.x = -Math.PI/2;
+        floor.receiveShadow = true;
+        scene.add(floor);
+        
+        const grid = new THREE.GridHelper(ARENA_SIZE, 50, 0xcccccc, 0xeeeeee);
+        grid.position.y = 0.02;
+        scene.add(grid);
+
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth/window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        const updateMouse = (x, y) => {
+            mouse.x = (x / window.innerWidth) * 2 - 1;
+            mouse.y = -(y / window.innerHeight) * 2 + 1;
+            if(!isGameOver && player) {
+                raycaster.setFromCamera(mouse, camera);
+                raycaster.ray.intersectPlane(groundPlane, targetPoint);
+                player.targetAngle = Math.atan2(targetPoint.x - player.mesh.position.x, targetPoint.z - player.mesh.position.z);
+            }
+        };
+
+        window.addEventListener('mousemove', e => updateMouse(e.clientX, e.clientY));
+        window.addEventListener('touchmove', e => {
+            e.preventDefault();
+            updateMouse(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: false });
+
+        startBtn.addEventListener('click', startGame);
+    }
+
+    function spawnBoss() {
+        if (bossExists) return;
+        bossWarning.style.display = 'block';
+        setTimeout(() => bossWarning.style.display = 'none', 3000);
+        
+        const boss = new Bot("THE EXTERMINATOR", true);
+        entities.push(boss);
+        bossExists = true;
+    }
+
+    function startGame() {
+        entities.forEach(e => scene.remove(e.mesh));
+        foods.forEach(f => scene.remove(f.mesh));
+        entities = []; foods = [];
+        isGameOver = false;
+        bossExists = false;
+        overlay.style.display = 'none';
+        player = new Entity("You", true);
+        entities.push(player);
+        for(let i=0; i<MAX_BOTS; i++) entities.push(new Bot(botNames[i%botNames.length] + i));
+        for(let i=0; i<MAX_FOODS; i++) spawnFood();
+        animate();
+    }
+
+    function spawnFood() {
+        const f = { mesh: createFoodMesh(), value: 20 };
+        f.mesh.position.set((Math.random()-0.5)*ARENA_SIZE, 0.3, (Math.random()-0.5)*ARENA_SIZE);
+        scene.add(f.mesh);
+        foods.push(f);
+    }
+
+    function checkCollisions() {
+        entities.forEach(ent => {
+            const range = 2.5 * ent.size;
+            for(let i=foods.length-1; i>=0; i--) {
+                if(ent.mesh.position.distanceTo(foods[i].mesh.position) < range) {
+                    ent.score += foods[i].value;
+                    ent.updateScale();
+                    scene.remove(foods[i].mesh);
+                    foods.splice(i, 1);
+                    spawnFood();
+                }
+            }
+        });
+
+        for(let i=0; i<entities.length; i++) {
+            const pred = entities[i];
+            if(!pred) continue;
+            for(let j=0; j<entities.length; j++) {
+                if(i === j) continue;
+                const prey = entities[j];
+                if(!prey) continue;
+                
+                if(pred.score > prey.score * EAT_THRESHOLD) {
+                    const dist = pred.mesh.position.distanceTo(prey.mesh.position);
+                    if(dist < ATTACK_RANGE_MULTIPLIER * pred.size) {
+                        pred.score += prey.score * 0.7;
+                        pred.updateScale();
+                        if(prey.isPlayer) { gameOver(); return; }
+                        if(prey.isBoss) bossExists = false;
+                        scene.remove(prey.mesh);
+                        entities[j] = null;
+                    }
+                }
+            }
+        }
+        entities = entities.filter(e => e !== null);
+        
+        // ボス出現ロジック
+        if (!bossExists && player && player.score > 500 && Math.random() < 0.002) {
+            spawnBoss();
+        }
+    }
+
+    function updateCamera() {
+        if(!player) return;
+        const offset = 25 + player.size * 14;
+        camera.position.lerp(new THREE.Vector3(player.mesh.position.x, offset * 1.4, player.mesh.position.z - offset), 0.1);
+        camera.lookAt(player.mesh.position.x, 0, player.mesh.position.z + 5);
+    }
+
+    function updateUI() {
+        if(!player) return;
+        sizeDisplay.innerText = Math.floor(player.score);
+        const sorted = [...entities].sort((a,b) => b.score - a.score);
+        leaderboardList.innerHTML = '';
+        sorted.slice(0, 5).forEach((ent, i) => {
+            const item = document.createElement('div');
+            let className = 'leaderboard-item';
+            if (ent.isPlayer) className += ' is-player';
+            if (ent.isBoss) className += ' is-boss';
+            item.className = className;
+            item.innerHTML = `<span class="rank-num">${i+1}</span> <span class="bot-name">${ent.isBoss ? "!! BOSS !!" : ent.name}</span> <span>${Math.floor(ent.score)}</span>`;
+            leaderboardList.appendChild(item);
+        });
+    }
+
+    function drawMinimap() {
+        if(!player) return;
+        minimapCtx.clearRect(0,0,140,140);
+        const scale = 0.28;
+        const cx = 70, cy = 70;
+        entities.forEach(ent => {
+            const dx = (ent.mesh.position.x - player.mesh.position.x) * scale;
+            const dy = (ent.mesh.position.z - player.mesh.position.z) * scale;
+            if(Math.sqrt(dx*dx + dy*dy) < 65) {
+                if (ent.isBoss) {
+                    minimapCtx.fillStyle = '#ff0000';
+                    minimapCtx.beginPath();
+                    minimapCtx.arc(cx+dx, cy+dy, 6, 0, Math.PI*2);
+                    minimapCtx.fill();
+                } else {
+                    minimapCtx.fillStyle = ent.isPlayer ? '#00ee00' : (ent.score > player.score * EAT_THRESHOLD ? '#ff0000' : '#00aaff');
+                    minimapCtx.beginPath();
+                    minimapCtx.arc(cx+dx, cy+dy, 3, 0, Math.PI*2);
+                    minimapCtx.fill();
+                }
+            }
+        });
+    }
+
+    function gameOver() {
+        isGameOver = true;
+        document.getElementById('overlay').style.display = 'flex';
+        overlay.innerHTML = `<h1 style="color:#ff0000; font-size: 50px;">DEFEATED</h1><p style="font-size: 24px;">SCORE: ${Math.floor(player.score)}</p><button onclick="location.reload()">RETRY</button>`;
+    }
+
+    function animate() {
+        if(isGameOver) return;
+        requestAnimationFrame(animate);
+        entities.forEach(e => {
+            if(e instanceof Bot) e.updateAI();
+            e.move();
+        });
+        checkCollisions();
+        updateCamera();
+        if(renderer.info.render.frame % 10 === 0) {
+            updateUI();
+            drawMinimap();
+        }
+        renderer.render(scene, camera);
+    }
+    window.onload = init;
+</script>
+</body>
+</html>
