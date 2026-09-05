@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>GOKIBURYYYYY - ボスバトル・エディション</title>
+    <meta name="description" content="エサを食べて成長し、格上のボスに挑む3Dサバイバルゲーム。">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://gokiburyyyyy.vercel.app/">
+    <meta property="og:title" content="GOKIBURYYYYY - ボスバトル・エディション">
+    <meta property="og:description" content="エサを食べて成長し、格上のボスに挑む3Dサバイバルゲーム。">
+    <meta name="twitter:card" content="summary">
     <style>
         body, html {
             margin: 0;
@@ -223,7 +229,7 @@
         
         // Body segments
         for(let i=0; i<3; i++) {
-            const segmentGeo = new THREE.SphereGeometry(1, 24, 24);
+            const segmentGeo = new THREE.SphereGeometry(1, 12, 12);
             const segment = new THREE.Mesh(segmentGeo, material);
             const zOff = -0.4 + i * 0.45;
             segment.scale.set(0.6 - (i*0.05), 0.22, 0.5);
@@ -234,7 +240,7 @@
         }
 
         // Head
-        const headGeo = new THREE.SphereGeometry(0.38, 16, 16);
+        const headGeo = new THREE.SphereGeometry(0.38, 10, 10);
         const headMat = new THREE.MeshPhongMaterial({ color: 0x010101, shininess: 150 });
         const head = new THREE.Mesh(headGeo, headMat);
         head.scale.set(1.1, 0.55, 1.2);
@@ -242,7 +248,7 @@
         group.add(head);
 
         // Wings
-        const wingGeo = new THREE.SphereGeometry(1.05, 24, 24);
+        const wingGeo = new THREE.SphereGeometry(1.05, 12, 12);
         const wingMat = new THREE.MeshPhongMaterial({ 
             color: isBoss ? 0x220000 : colorStr, 
             transparent: true, 
@@ -430,12 +436,24 @@
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.getElementById('game-container').appendChild(renderer.domElement);
 
+        // このシーンは常時30体超のアニメーション+シャドウマップを描画する
+        // 負荷の高いWebGLシーンで、メモリの厳しいスマホ端末ではブラウザに
+        // よってコンテキストが強制的に失われることがある(既知のブラウザ仕様)。
+        // 対策が無いと画面が真っ白/フリーズしたまま、ユーザーには何が
+        // 起きたのか一切分からず、再読み込みが必要なことにも気づけない。
+        renderer.domElement.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault();
+            isGameOver = true;
+            overlay.style.display = 'flex';
+            overlay.innerHTML = `<h1 style="font-size: 40px;">描画がリセットされました</h1><p style="font-size: 18px; color: #444;">端末の負荷が高くなったため、画面の再読み込みが必要です。</p><button onclick="location.reload()">再読み込み</button>`;
+        }, false);
+
         scene.add(new THREE.AmbientLight(0xffffff, 0.7));
         const sun = new THREE.DirectionalLight(0xffffff, 0.7);
         sun.position.set(40, 150, -10);
         sun.castShadow = true;
-        sun.shadow.mapSize.width = 2048;
-        sun.shadow.mapSize.height = 2048;
+        sun.shadow.mapSize.width = 1024;
+        sun.shadow.mapSize.height = 1024;
         sun.shadow.camera.left = -500;
         sun.shadow.camera.right = 500;
         sun.shadow.camera.top = 500;
@@ -470,12 +488,34 @@
         };
 
         window.addEventListener('mousemove', e => updateMouse(e.clientX, e.clientY));
+        // touchmoveだけだと、指を置いただけでまだ動かしていない最初の一瞬は
+        // 方向が反映されない(スマホが主な操作手段のゲームなのに、
+        // 最初のタップが何も起きないように見えてしまう)。touchstartでも
+        // 同じ処理を行い、触れた瞬間から方向が反映されるようにする。
+        window.addEventListener('touchstart', e => {
+            e.preventDefault();
+            updateMouse(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: false });
         window.addEventListener('touchmove', e => {
             e.preventDefault();
             updateMouse(e.touches[0].clientX, e.touches[0].clientY);
         }, { passive: false });
 
         startBtn.addEventListener('click', startGame);
+    }
+
+    // scene.remove()はシーングラフから外すだけでGPUメモリは解放しない。
+    // エサは食べるたびに、敵は捕食されるたびに継続的に発生する処理なので、
+    // disposeし忘れるとプレイ時間が伸びるほどGPUメモリを消費し続け、
+    // 特にスマホでは長時間プレイでクラッシュ・重量化につながる。
+    function disposeObject3D(obj) {
+        obj.traverse(node => {
+            if (node.geometry) node.geometry.dispose();
+            if (node.material) {
+                if (Array.isArray(node.material)) node.material.forEach(m => m.dispose());
+                else node.material.dispose();
+            }
+        });
     }
 
     function spawnBoss() {
@@ -496,8 +536,8 @@
     }
 
     function startGame() {
-        entities.forEach(e => scene.remove(e.mesh));
-        foods.forEach(f => scene.remove(f.mesh));
+        entities.forEach(e => { scene.remove(e.mesh); disposeObject3D(e.mesh); });
+        foods.forEach(f => { scene.remove(f.mesh); disposeObject3D(f.mesh); });
         entities = []; foods = [];
         isGameOver = false;
         bossExists = false;
@@ -529,6 +569,7 @@
                     ent.score += foods[i].value;
                     ent.updateScale();
                     scene.remove(foods[i].mesh);
+                    disposeObject3D(foods[i].mesh);
                     foods.splice(i, 1);
                     spawnFood();
                 }
@@ -555,6 +596,7 @@
                         
                         // 消去
                         scene.remove(prey.mesh);
+                        disposeObject3D(prey.mesh);
                         entities[j] = null;
                     }
                 }
