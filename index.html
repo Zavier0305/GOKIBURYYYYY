@@ -227,6 +227,105 @@
             transform: translateY(-2px);
             box-shadow: 0 8px 20px rgba(122,0,0,0.32);
         }
+        #help-btn {
+            position: absolute;
+            bottom: 20px;
+            left: 20px;
+            width: 46px;
+            height: 46px;
+            padding: 0;
+            margin: 0;
+            font-size: 20px;
+            line-height: 46px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            /* #overlay(タイトル/リザルト画面, z-index:10)より前面、
+               #tutorial-overlay(z-index:20)より背面に置き、
+               ゲーム中・タイトル中を問わず常に押せるようにする。 */
+            z-index: 15;
+            font-family: 'Shippori Mincho', serif;
+        }
+        #tutorial-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(250, 245, 236, 0.92);
+            backdrop-filter: blur(4px);
+            z-index: 20;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            pointer-events: auto;
+            color: var(--ink);
+            text-align: center;
+        }
+        #tutorial-overlay .panel {
+            text-align: left;
+            max-width: 480px;
+            max-height: 82vh;
+            overflow-y: auto;
+        }
+        #tutorial-overlay h1 {
+            font-size: 32px;
+            text-align: center;
+        }
+        .tutorial-section {
+            margin-top: 20px;
+        }
+        .tutorial-section h2 {
+            margin: 0 0 6px;
+            font-family: 'Shippori Mincho', serif;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--maroon);
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .tutorial-section h2::before {
+            content: '';
+            width: 8px;
+            height: 8px;
+            background: var(--gold);
+            transform: rotate(45deg);
+            display: inline-block;
+            flex-shrink: 0;
+        }
+        .tutorial-section p {
+            margin: 0;
+            font-size: 14px;
+            line-height: 1.7;
+            color: var(--ink-soft);
+            text-align: left;
+        }
+        .tutorial-section p.boss-note {
+            color: var(--maroon-dark);
+            font-weight: 700;
+        }
+        #tutorial-overlay button {
+            display: block;
+            margin: 28px auto 0;
+        }
+        #boss-eaten-msg {
+            position: absolute;
+            top: 38%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: var(--maroon);
+            font-family: 'Shippori Mincho', serif;
+            font-size: 44px;
+            font-weight: 800;
+            letter-spacing: 2px;
+            text-shadow: 0 0 18px rgba(250,245,236,0.95), 0 0 3px #fffdf9;
+            display: none;
+            z-index: 5;
+            text-align: center;
+            animation: pulse 0.5s infinite;
+        }
         #minimap {
             position: absolute;
             bottom: 20px;
@@ -258,6 +357,7 @@
         <canvas id="minimap-canvas" width="140" height="140"></canvas>
     </div>
     <div id="boss-warning">WARNING!<br>BOSS APPEARED</div>
+    <div id="boss-eaten-msg">ボスを食べた!</div>
 </div>
 
 <div id="overlay">
@@ -268,19 +368,54 @@
     </div>
 </div>
 
+<!-- タイトル画面(#overlay, z-index:10)の上にも常に出したいので、z-indexの
+     兼ね合いから#ui-layer(z-index:2)の外に独立要素として配置する。 -->
+<button id="help-btn" title="遊び方">?</button>
+
+<div id="tutorial-overlay">
+    <div class="panel">
+        <h1>遊び方</h1>
+        <div class="tutorial-section">
+            <h2>操作</h2>
+            <p>マウス(スマホはタッチ)を動かした方向へ、ゴキブリが自動で進みます。画面をタップ/クリックし続けて移動方向を調整しましょう。</p>
+        </div>
+        <div class="tutorial-section">
+            <h2>成長</h2>
+            <p>光るエサを食べるとスコアが増えて成長します。自分より十分小さい敵(緑=自分、青=格下、赤=格上)に体当たりすると捕食でき、大きなボーナスが手に入ります。</p>
+        </div>
+        <div class="tutorial-section">
+            <h2>ランキング</h2>
+            <p>右上のRANKINGパネルに現在のスコア上位5体が表示されます。自分の順位(強調表示)を確認しながら、頂点を目指しましょう。</p>
+        </div>
+        <div class="tutorial-section">
+            <h2>ボス戦(新要素)</h2>
+            <p>赤いオーラを纏った「ボス」が出現することがあります。まだ小さいうちに触れると即座に食べられてしまう危険な相手ですが、十分成長する(目安:ボスの1.3倍のスコア)と、逆に<strong>ボスを食べて</strong>大量のスコアを獲得できます。</p>
+            <p class="boss-note">油断は禁物。弱いうちは近づかないこと!</p>
+        </div>
+        <button id="tutorial-close-btn">わかった!</button>
+    </div>
+</div>
+
 <script>
     const ARENA_SIZE = 500;
     const MAX_FOODS = 250;
     const MAX_BOTS = 35; // 常駐するBotの数
     const BASE_SPEED = 0.65;
-    const EAT_THRESHOLD = 1.1; 
-    const ATTACK_RANGE_MULTIPLIER = 2.6; 
-    
+    const EAT_THRESHOLD = 1.1;
+    const ATTACK_RANGE_MULTIPLIER = 2.6;
+    // ボスは通常の敵より頑丈: 通常の1.1倍ではなく1.3倍のスコアが
+    // 無いと食べられない(通常進行で無理なく到達できるが、簡単すぎない値)。
+    const BOSS_EAT_THRESHOLD = 1.3;
+    // ボスを食べた際のスコアボーナスは通常の捕食(0.7倍)より大きい特別報酬。
+    const BOSS_EAT_BONUS_RATIO = 1.0;
+    const TUTORIAL_KEY = 'goki_tutorial_seen';
+
     let scene, camera, renderer, player;
     let entities = [];
     let foods = [];
     let isGameOver = true;
     let bossExists = false;
+    let isTutorialOpen = false;
     
     const raycaster = new THREE.Raycaster();
     const mouse = new THREE.Vector2();
@@ -294,22 +429,57 @@
     const sizeDisplay = document.getElementById('player-size');
     const leaderboardList = document.getElementById('leaderboard-list');
     const bossWarning = document.getElementById('boss-warning');
+    const bossEatenMsg = document.getElementById('boss-eaten-msg');
+    const helpBtn = document.getElementById('help-btn');
+    const tutorialOverlay = document.getElementById('tutorial-overlay');
+    const tutorialCloseBtn = document.getElementById('tutorial-close-btn');
+    let bossEatenTimer = null;
+
+    function showBossEatenToast() {
+        bossEatenMsg.style.display = 'block';
+        clearTimeout(bossEatenTimer);
+        bossEatenTimer = setTimeout(() => { bossEatenMsg.style.display = 'none'; }, 2200);
+    }
+
+    // 初回プレイヤー向けチュートリアル。localStorageが使えない環境
+    // (プライベートブラウズ等)でも例外で落ちないようtry/catchで保護する。
+    function showTutorial() {
+        isTutorialOpen = true;
+        tutorialOverlay.style.display = 'flex';
+    }
+    function closeTutorial() {
+        isTutorialOpen = false;
+        tutorialOverlay.style.display = 'none';
+        try { localStorage.setItem(TUTORIAL_KEY, '1'); } catch(e) {}
+    }
+    helpBtn.addEventListener('click', showTutorial);
+    tutorialCloseBtn.addEventListener('click', closeTutorial);
 
     const botNames = ["DeathBug", "King-G", "FastCrawler", "BrownDevil", "Shadow", "WallStar", "Turbo-G", "EliteBug", "Agile-G", "Nightmare"];
 
     // ゴキブリの3Dモデル作成
+    // ポリゴン数はスマホ性能を考慮して低く抑えつつ(球の分割数は据え置き)、
+    // 胸部の甲皮(pronotum)・複眼・関節のある触角を追加してシルエットの
+    // リアリティを底上げする。新規追加ジオメトリはBox/低分割Sphereのみ。
     function createRoachMesh(colorStr, isPlayer, isBoss = false) {
         const group = new THREE.Group();
-        const material = new THREE.MeshPhongMaterial({ 
+        const material = new THREE.MeshPhongMaterial({
             color: isBoss ? 0x110000 : colorStr,
             shininess: isBoss ? 400 : 250,
             specular: isBoss ? 0xff0000 : 0xaaaaaa
         });
-        
-        // Body segments
+        // 腹部(後方)は艶を落として胸部と質感を分ける。ジオメトリは共有し
+        // マテリアルのみ分岐するのでポリゴンコストは増えない。
+        const abdomenMat = new THREE.MeshPhongMaterial({
+            color: isBoss ? 0x0c0000 : colorStr,
+            shininess: isBoss ? 200 : 110,
+            specular: isBoss ? 0x880000 : 0x555555
+        });
+
+        // Body segments (thorax -> abdomen tip)
         for(let i=0; i<3; i++) {
             const segmentGeo = new THREE.SphereGeometry(1, 12, 12);
-            const segment = new THREE.Mesh(segmentGeo, material);
+            const segment = new THREE.Mesh(segmentGeo, i === 0 ? material : abdomenMat);
             const zOff = -0.4 + i * 0.45;
             segment.scale.set(0.6 - (i*0.05), 0.22, 0.5);
             segment.position.set(0, 0.25, zOff);
@@ -317,6 +487,14 @@
             segment.receiveShadow = true;
             group.add(segment);
         }
+
+        // Pronotum: 頭と胸部の間にある扁平な甲皮の盾板。BoxGeometryは
+        // Sphereより格段に安く(12tri)、シルエットの実在感を高める。
+        const pronotumGeo = new THREE.BoxGeometry(0.72, 0.24, 0.4);
+        const pronotum = new THREE.Mesh(pronotumGeo, material);
+        pronotum.position.set(0, 0.32, 0.92);
+        pronotum.castShadow = true;
+        group.add(pronotum);
 
         // Head
         const headGeo = new THREE.SphereGeometry(0.38, 10, 10);
@@ -326,23 +504,47 @@
         head.position.set(0, 0.25, 1.35);
         group.add(head);
 
-        // Wings
-        const wingGeo = new THREE.SphereGeometry(1.05, 12, 12);
-        const wingMat = new THREE.MeshPhongMaterial({ 
-            color: isBoss ? 0x220000 : colorStr, 
-            transparent: true, 
-            opacity: 0.85, 
-            shininess: 300 
+        // Compound eyes: Box(12tri固定)を2個。Sphereより大幅に安く、
+        // 個体数(最大35体超)を掛けても総ポリゴン数への影響を抑えられる。
+        // ボスは赤い光沢を持たせて禍々しさを出す。
+        const eyeGeo = new THREE.BoxGeometry(0.13, 0.11, 0.11);
+        const eyeMat = new THREE.MeshPhongMaterial({
+            color: isBoss ? 0x3a0000 : 0x1a0d05,
+            shininess: 300,
+            specular: isBoss ? 0xff2200 : 0x666666
         });
-        const wing = new THREE.Mesh(wingGeo, wingMat);
-        wing.scale.set(0.6, 0.12, 1.1);
-        wing.position.set(0, 0.38, -0.1);
-        group.add(wing);
+        [-1, 1].forEach(side => {
+            const eye = new THREE.Mesh(eyeGeo, eyeMat);
+            eye.position.set(0.24 * side, 0.32, 1.55);
+            group.add(eye);
+        });
 
-        // Antennas
+        // Wings: 中央で2枚に分けた翅鞘(tegmina)にして、実際の甲皮翅の
+        // 継ぎ目を表現する。分割数を1枚だった時より下げて総ポリゴン数は
+        // ほぼ同等〜微減に抑える。
+        const wingMat = new THREE.MeshPhongMaterial({
+            color: isBoss ? 0x220000 : colorStr,
+            transparent: true,
+            opacity: 0.85,
+            shininess: 300
+        });
+        [-1, 1].forEach(side => {
+            const wingGeo = new THREE.SphereGeometry(1.05, 8, 8);
+            const wing = new THREE.Mesh(wingGeo, wingMat);
+            wing.scale.set(0.29, 0.12, 1.1);
+            wing.position.set(0.16 * side, 0.38, -0.1);
+            group.add(wing);
+        });
+
+        // Antennas: 1本の直線ではなく2関節のポリラインにして、根元から
+        // 先端に向かって自然にしなる曲線を表現する(ジオメトリコストはゼロ)。
         const antennaMat = new THREE.LineBasicMaterial({ color: isBoss ? 0xff0000 : 0x111111 });
-        const ant1Geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0.8, 0.5, 2.2)]);
-        const ant2Geo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(-0.8, 0.5, 2.2)]);
+        const ant1Geo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0,0,0), new THREE.Vector3(0.45, 0.32, 1.15), new THREE.Vector3(0.8, 0.5, 2.2)
+        ]);
+        const ant2Geo = new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0,0,0), new THREE.Vector3(-0.45, 0.32, 1.15), new THREE.Vector3(-0.8, 0.5, 2.2)
+        ]);
         const ant1 = new THREE.Line(ant1Geo, antennaMat);
         const ant2 = new THREE.Line(ant2Geo, antennaMat);
         ant1.position.set(0.1, 0.35, 1.5);
@@ -559,7 +761,7 @@
         const updateMouse = (x, y) => {
             mouse.x = (x / window.innerWidth) * 2 - 1;
             mouse.y = -(y / window.innerHeight) * 2 + 1;
-            if(!isGameOver && player) {
+            if(!isGameOver && player && !isTutorialOpen) {
                 raycaster.setFromCamera(mouse, camera);
                 raycaster.ray.intersectPlane(groundPlane, targetPoint);
                 player.targetAngle = Math.atan2(targetPoint.x - player.mesh.position.x, targetPoint.z - player.mesh.position.z);
@@ -581,6 +783,17 @@
         }, { passive: false });
 
         startBtn.addEventListener('click', startGame);
+
+        // 初回訪問時は自動でチュートリアルを表示する。以後はhelp-btn(?)から
+        // いつでも再表示できる。
+        try {
+            if (!localStorage.getItem(TUTORIAL_KEY)) {
+                showTutorial();
+            }
+        } catch(e) {
+            // localStorageが使えない場合も安全側(常時表示せず1回だけ表示)に倒す
+            showTutorial();
+        }
     }
 
     // scene.remove()はシーングラフから外すだけでGPUメモリは解放しない。
@@ -663,16 +876,26 @@
                 const prey = entities[j];
                 if(!prey) continue;
                 
-                if(pred.score > prey.score * EAT_THRESHOLD) {
+                // ボスは通常の敵より頑丈: 捕食に必要な倍率(BOSS_EAT_THRESHOLD)を
+                // 通常のEAT_THRESHOLDより高く設定する。これにより、まだ小さい
+                // うちはボスに触れても逆に捕食される一方(下のpred=boss側のループで
+                // 通常のEAT_THRESHOLDにより処理される)、十分育てば今度はこちらが
+                // ボスを食べられるようになる。
+                const requiredRatio = prey.isBoss ? BOSS_EAT_THRESHOLD : EAT_THRESHOLD;
+                if(pred.score > prey.score * requiredRatio) {
                     const dist = pred.mesh.position.distanceTo(prey.mesh.position);
                     if(dist < ATTACK_RANGE_MULTIPLIER * pred.size) {
-                        pred.score += prey.score * 0.7;
+                        const bonusRatio = prey.isBoss ? BOSS_EAT_BONUS_RATIO : 0.7;
+                        pred.score += prey.score * bonusRatio;
                         pred.updateScale();
-                        
+
                         if(prey.isPlayer) { gameOver(); return; }
-                        
-                        if(prey.isBoss) bossExists = false;
-                        
+
+                        if(prey.isBoss) {
+                            bossExists = false;
+                            if(pred.isPlayer) showBossEatenToast();
+                        }
+
                         // 消去
                         scene.remove(prey.mesh);
                         disposeObject3D(prey.mesh);
