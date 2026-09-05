@@ -430,6 +430,18 @@
         renderer.shadowMap.type = THREE.PCFSoftShadowMap;
         document.getElementById('game-container').appendChild(renderer.domElement);
 
+        // このシーンは常時30体超のアニメーション+シャドウマップを描画する
+        // 負荷の高いWebGLシーンで、メモリの厳しいスマホ端末ではブラウザに
+        // よってコンテキストが強制的に失われることがある(既知のブラウザ仕様)。
+        // 対策が無いと画面が真っ白/フリーズしたまま、ユーザーには何が
+        // 起きたのか一切分からず、再読み込みが必要なことにも気づけない。
+        renderer.domElement.addEventListener('webglcontextlost', (e) => {
+            e.preventDefault();
+            isGameOver = true;
+            overlay.style.display = 'flex';
+            overlay.innerHTML = `<h1 style="font-size: 40px;">描画がリセットされました</h1><p style="font-size: 18px; color: #444;">端末の負荷が高くなったため、画面の再読み込みが必要です。</p><button onclick="location.reload()">再読み込み</button>`;
+        }, false);
+
         scene.add(new THREE.AmbientLight(0xffffff, 0.7));
         const sun = new THREE.DirectionalLight(0xffffff, 0.7);
         sun.position.set(40, 150, -10);
