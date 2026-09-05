@@ -40,7 +40,7 @@
             background: rgba(255, 255, 255, 0.85);
             padding: 8px 16px;
             border-radius: 6px;
-            border-left: 6px solid #ffcc00;
+            border-left: 6px solid #a97a1f;
             box-shadow: 0 2px 10px rgba(0,0,0,0.15);
         }
         #score-display {
@@ -83,7 +83,7 @@
             overflow: hidden;
         }
         .leaderboard-item.is-player {
-            background: #ffcc00;
+            background: #a97a1f;
             color: #000000;
             font-weight: 900;
         }
@@ -132,7 +132,7 @@
             font-size: 24px;
             font-weight: 900;
             background: #000;
-            color: #ffcc00;
+            color: #a97a1f;
             border: none;
             border-radius: 8px;
             cursor: pointer;
@@ -300,7 +300,7 @@
 
         if (isPlayer) {
             const rangeGeo = new THREE.RingGeometry(ATTACK_RANGE_MULTIPLIER - 0.05, ATTACK_RANGE_MULTIPLIER + 0.05, 64);
-            const rangeMat = new THREE.MeshBasicMaterial({ color: 0xffcc00, side: THREE.DoubleSide, transparent: true, opacity: 0.4 });
+            const rangeMat = new THREE.MeshBasicMaterial({ color: 0xa97a1f, side: THREE.DoubleSide, transparent: true, opacity: 0.4 });
             const rangeRing = new THREE.Mesh(rangeGeo, rangeMat);
             rangeRing.rotation.x = -Math.PI / 2;
             rangeRing.position.y = 0.02;
