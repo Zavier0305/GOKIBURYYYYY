@@ -4,6 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>GOKIBURYYYYY - ボスバトル・エディション</title>
+    <meta name="description" content="エサを食べて成長し、格上のボスに挑む3Dサバイバルゲーム。">
+    <meta property="og:type" content="website">
+    <meta property="og:url" content="https://gokiburyyyyy.vercel.app/">
+    <meta property="og:title" content="GOKIBURYYYYY - ボスバトル・エディション">
+    <meta property="og:description" content="エサを食べて成長し、格上のボスに挑む3Dサバイバルゲーム。">
+    <meta name="twitter:card" content="summary">
     <style>
         body, html {
             margin: 0;
@@ -482,6 +488,14 @@
         };
 
         window.addEventListener('mousemove', e => updateMouse(e.clientX, e.clientY));
+        // touchmoveだけだと、指を置いただけでまだ動かしていない最初の一瞬は
+        // 方向が反映されない(スマホが主な操作手段のゲームなのに、
+        // 最初のタップが何も起きないように見えてしまう)。touchstartでも
+        // 同じ処理を行い、触れた瞬間から方向が反映されるようにする。
+        window.addEventListener('touchstart', e => {
+            e.preventDefault();
+            updateMouse(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: false });
         window.addEventListener('touchmove', e => {
             e.preventDefault();
             updateMouse(e.touches[0].clientX, e.touches[0].clientY);
