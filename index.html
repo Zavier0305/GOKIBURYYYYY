@@ -504,6 +504,20 @@
         startBtn.addEventListener('click', startGame);
     }
 
+    // scene.remove()はシーングラフから外すだけでGPUメモリは解放しない。
+    // エサは食べるたびに、敵は捕食されるたびに継続的に発生する処理なので、
+    // disposeし忘れるとプレイ時間が伸びるほどGPUメモリを消費し続け、
+    // 特にスマホでは長時間プレイでクラッシュ・重量化につながる。
+    function disposeObject3D(obj) {
+        obj.traverse(node => {
+            if (node.geometry) node.geometry.dispose();
+            if (node.material) {
+                if (Array.isArray(node.material)) node.material.forEach(m => m.dispose());
+                else node.material.dispose();
+            }
+        });
+    }
+
     function spawnBoss() {
         if (bossExists) return;
         bossWarning.style.display = 'block';
@@ -522,8 +536,8 @@
     }
 
     function startGame() {
-        entities.forEach(e => scene.remove(e.mesh));
-        foods.forEach(f => scene.remove(f.mesh));
+        entities.forEach(e => { scene.remove(e.mesh); disposeObject3D(e.mesh); });
+        foods.forEach(f => { scene.remove(f.mesh); disposeObject3D(f.mesh); });
         entities = []; foods = [];
         isGameOver = false;
         bossExists = false;
@@ -555,6 +569,7 @@
                     ent.score += foods[i].value;
                     ent.updateScale();
                     scene.remove(foods[i].mesh);
+                    disposeObject3D(foods[i].mesh);
                     foods.splice(i, 1);
                     spawnFood();
                 }
@@ -581,6 +596,7 @@
                         
                         // 消去
                         scene.remove(prey.mesh);
+                        disposeObject3D(prey.mesh);
                         entities[j] = null;
                     }
                 }
