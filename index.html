@@ -223,7 +223,7 @@
         
         // Body segments
         for(let i=0; i<3; i++) {
-            const segmentGeo = new THREE.SphereGeometry(1, 24, 24);
+            const segmentGeo = new THREE.SphereGeometry(1, 12, 12);
             const segment = new THREE.Mesh(segmentGeo, material);
             const zOff = -0.4 + i * 0.45;
             segment.scale.set(0.6 - (i*0.05), 0.22, 0.5);
@@ -234,7 +234,7 @@
         }
 
         // Head
-        const headGeo = new THREE.SphereGeometry(0.38, 16, 16);
+        const headGeo = new THREE.SphereGeometry(0.38, 10, 10);
         const headMat = new THREE.MeshPhongMaterial({ color: 0x010101, shininess: 150 });
         const head = new THREE.Mesh(headGeo, headMat);
         head.scale.set(1.1, 0.55, 1.2);
@@ -242,7 +242,7 @@
         group.add(head);
 
         // Wings
-        const wingGeo = new THREE.SphereGeometry(1.05, 24, 24);
+        const wingGeo = new THREE.SphereGeometry(1.05, 12, 12);
         const wingMat = new THREE.MeshPhongMaterial({ 
             color: isBoss ? 0x220000 : colorStr, 
             transparent: true, 
@@ -434,8 +434,8 @@
         const sun = new THREE.DirectionalLight(0xffffff, 0.7);
         sun.position.set(40, 150, -10);
         sun.castShadow = true;
-        sun.shadow.mapSize.width = 2048;
-        sun.shadow.mapSize.height = 2048;
+        sun.shadow.mapSize.width = 1024;
+        sun.shadow.mapSize.height = 1024;
         sun.shadow.camera.left = -500;
         sun.shadow.camera.right = 500;
         sun.shadow.camera.top = 500;
